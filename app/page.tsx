@@ -19,6 +19,13 @@ export default function LandingPage() {
           >
             Join waitlist <ArrowRight className="h-4 w-4" />
           </a>
+          <a
+  href="/plan"
+  className="ml-4 inline-flex items-center gap-2 rounded-xl border border-slate-300 px-6 py-3 text-sm font-medium hover:bg-slate-100 transition"
+>
+  Try the Demo
+</a>
+
         </div>
       </header>
 
