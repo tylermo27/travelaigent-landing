@@ -1,65 +1,76 @@
+// app/api/generate/route.js
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
   try {
-    // Quick sanity: do we have the key?
+    // Make sure your key is available on the server
     if (!process.env.OPENAI_API_KEY) {
-      console.error("Missing OPENAI_API_KEY");
       return NextResponse.json(
-        { error: "Server is missing OPENAI_API_KEY. Check .env.local and restart." },
+        { error: "Server is missing OPENAI_API_KEY. Check .env.local and restart dev server." },
         { status: 500 }
       );
     }
 
-    const body = await req.json();
-    const { destination = "", dates = "", budget = "", style = "" } = body;
+    // Read inputs from the request body (slotHint is NEW and optional)
+    const {
+      destination = "",
+      dates = "",
+      budget = "",
+      style = "",
+      slotHint = "",
+    } = await req.json();
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const userPrompt = `
-Create a concise 3-day itinerary.
+    // Build the prompt differently if we're swapping a single slot
+    const userPrompt = (
+      slotHint
+        ? `
+You are TravelAIgent.
 
 Destination: ${destination || "anywhere"}
 Dates: ${dates || "flexible"}
 Budget: ${budget || "reasonable"}
 Style: ${style || "Local + tourist mix"}
 
-Format:
+IMPORTANT: The traveler wants to swap just this slot: "${slotHint}".
+Return ONLY 2–3 alternative ideas for that single slot, each on its own line with:
+- a short reason, and
+- a price vibe ($, $$, $$$).
+Do not include any other text.
+        `
+        : `
+You are TravelAIgent, a practical planner. Create a concise 3-day itinerary.
+
+Destination: ${destination || "anywhere"}
+Dates: ${dates || "flexible"}
+Budget: ${budget || "reasonable"}
+Style: ${style || "Local + tourist mix"}
+
+Format exactly:
 Day 1 — Morning / Afternoon / Evening
 Day 2 — Morning / Afternoon / Evening
 Day 3 — Morning / Afternoon / Evening
-Add 3 optional Mix & Match ideas at the end.
-    `.trim();
 
-    // Try preferred model; if it fails, fallback
-    let itinerary = "";
-    try {
-      const r1 = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.7,
-        messages: [
-          { role: "system", content: "You are a helpful, practical travel planner." },
-          { role: "user", content: userPrompt },
-        ],
-      });
-      itinerary = r1.choices?.[0]?.message?.content || "";
-    } catch (e) {
-      console.warn("gpt-4o-mini failed, trying gpt-4o…", e?.message);
-      const r2 = await client.chat.completions.create({
-        model: "gpt-4o",
-        temperature: 0.7,
-        messages: [
-          { role: "system", content: "You are a helpful, practical travel planner." },
-          { role: "user", content: userPrompt },
-        ],
-      });
-      itinerary = r2.choices?.[0]?.message?.content || "";
-    }
+Then add 3 optional "Mix & Match" ideas at the end.
+- Keep it scannable and realistic.
+- Include 1–2 authentic/local spots per day.
+- Use price vibes ($ budget, $$ midrange, $$$ higher) where helpful.
+        `
+    ).trim();
 
-    if (!itinerary) {
-      throw new Error("Empty itinerary from OpenAI.");
-    }
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: "You are a helpful, practical travel planner." },
+        { role: "user", content: userPrompt },
+      ],
+    });
+
+    const itinerary = completion.choices?.[0]?.message?.content?.trim();
+    if (!itinerary) throw new Error("Empty itinerary from OpenAI.");
 
     return NextResponse.json({ itinerary });
   } catch (err) {
@@ -70,4 +81,3 @@ Add 3 optional Mix & Match ideas at the end.
     );
   }
 }
-
