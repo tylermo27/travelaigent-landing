@@ -94,16 +94,25 @@ END:VEVENT
   }
 
   function exportToCalendar() {
-    if (!itinerary) return;
-    const ics = buildICS(itinerary, dates);
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "travelaigent-itinerary.ics";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  if (!itinerary) return;
+
+  const ics = buildICS(itinerary, dates);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+
+  // Use destination name if provided, fallback to "travelaigent"
+  const safeName = (destination || "travelaigent")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")        // make it URL/file safe
+    .replace(/(^-|-$)/g, "");           // trim dashes
+
+  a.download = `${safeName}-itinerary.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
   // ---------- end ICS helpers ----------
 
 
